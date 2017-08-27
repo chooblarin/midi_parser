@@ -56,22 +56,22 @@ defmodule MidiParserTest do
 
   test "parse midi event of track" do
     note_on_data = <<0x90, 0x2D, 0x5A>>
-    {
-      {:midi, event, note_num, velocity},
-      rest
-    } = MidiParser.handle_midi_event(note_on_data)
+    {{:midi, event, note_num, velocity}, rest} = MidiParser.parse_event(note_on_data)
     assert event == :note_on
     assert note_num == 0x2D
     assert velocity == 0x5A
 
     note_off_data = <<0x80, 0x2D, 0x00>>
-    {
-      {:midi, event, note_num, velocity},
-      rest
-    } = MidiParser.handle_midi_event(note_off_data)
+    {{:midi, event, note_num, velocity}, rest} = MidiParser.parse_event(note_off_data)
     assert event == :note_off
     assert note_num == 0x2D
     assert velocity == 0x00
+
+    running_status_data = <<0x2C, 0x01>>
+    {{:midi, event, note_num, velocity}, rest} = MidiParser.parse_event(running_status_data, 0x80)
+    assert event == :note_off
+    assert note_num == 0x2C
+    assert velocity == 0x01
   end
 
   test "parse track body (including running status)" do
@@ -83,6 +83,11 @@ defmodule MidiParserTest do
     153, 42, 124, 125, 137, 42, 0, 0, 255, 47, 0
     >>
 
-    MidiParser.parse_track_chunk(data)
+    track = MidiParser.parse_track_chunk(data)
+    midi_count = track
+      |> Enum.filter(fn ({_, event}) -> elem(event, 0) == :midi end)
+      |> Enum.count
+
+    assert midi_count == 6
   end
 end

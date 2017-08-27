@@ -34,15 +34,20 @@ defmodule MidiParser do
     Enum.reverse(tracks)
   end
 
-  def parse_track_chunk(body) do parse_track_chunk(body, []) end
-  defp parse_track_chunk(<<>>, acc) do Enum.reverse acc end  
-  defp parse_track_chunk(body, acc) do
+  def parse_track_chunk(body) do parse_track_chunk(body, 0x00, []) end
+
+  defp parse_track_chunk(<<>>, prev, acc) do Enum.reverse acc end
+  defp parse_track_chunk(body, prev, acc) do
 
     {delta_time, rest} = parse_variable_length_data(body)
-    {value, rest_chunk} = parse_event(rest)
-    result = {delta_time, value}
+    {value, rest_chunk} = parse_event(rest, prev)
 
-    parse_track_chunk(rest_chunk, [result | acc])
+    case value do
+      {:midi, type, _, _} ->
+        parse_track_chunk(rest_chunk, type, [{delta_time, value} | acc])
+      _ ->
+        parse_track_chunk(rest_chunk, prev, [{delta_time, value} | acc])
+    end
   end
 
   def parse_variable_length_data(data) do
@@ -76,19 +81,24 @@ defmodule MidiParser do
   end
   defp variable_length_data(<<_ :: binary>>) do <<>> end
 
-  def parse_event(data) do
-    <<type, tail :: binary>> = data
-    case type do
+  def parse_event(<<status, _ :: binary>> = data, _) when status in [0xF0, 0xF7] do
+    handle_sysex_event(data)
+  end
 
-      # SysEx event
-      0xF0 -> handle_sysex_event(data)
-      0xF7 -> handle_sysex_event(data)
+  def parse_event(<<status, _ :: binary>> = data, _) when status == 0xFF do
+    handle_meta_event(data)
+  end
 
-      # meta event
-      0xFF -> handle_meta_event(data)
+  def parse_event(<<status, tail :: binary>> = data, prev \\ 0x00) do
+    <<msb :: size(1), _ :: size(7)>> = <<status>>
+    case msb do
+      0 -> # running-status
+        <<note_num, velocity, chunks :: binary>> = data
+        {{:midi, midi_event(prev), note_num, velocity}, chunks}
 
-      # MIDI event
-      _ -> handle_midi_event(data)
+      1 ->
+        <<note_num, velocity, chunks :: binary>> = tail
+        {{:midi, midi_event(status), note_num, velocity}, chunks}
     end
   end
 
@@ -133,8 +143,5 @@ defmodule MidiParser do
   defp midi_event(x) when x in 0x80..0x8f do :note_off end
   defp midi_event(x) when x in 0x90..0x9f do :note_on end
   defp midi_event(x) when x in 0xb0..0xbf do :ctrl_change end
-  defp midi_event(x) do
-    IO.inspect x
-    :unknown
-  end  # todo: I don't know exactly
+  defp midi_event(x) do :unknown end  # todo: I don't know exactly
 end
