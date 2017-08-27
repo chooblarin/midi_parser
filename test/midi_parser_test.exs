@@ -73,4 +73,16 @@ defmodule MidiParserTest do
     assert note_num == 0x2D
     assert velocity == 0x00
   end
+
+  test "parse track body (including running status)" do
+    data = <<
+    0, 255, 3, 4, 80, 101, 114, 99, 141, 151, 64, 153, 44, 83, 94, 137,
+    44, 0, 26, 153, 42, 90, 110, 137, 42, 0, 10, 153, 44, 94, 107, 137,
+    44, 0, 13, 153, 42, 99, 120, 44, 105, 19, 137, 42, 0, 101, 153, 42,
+    110, 8, 137, 44, 0, 112, 153, 44, 116, 10, 137, 42, 0, 103, 44, 0, 7,
+    153, 42, 124, 125, 137, 42, 0, 0, 255, 47, 0
+    >>
+
+    MidiParser.parse_track_chunk(data)
+  end
 end
