@@ -88,6 +88,6 @@ defmodule MidiParserTest do
       |> Enum.filter(fn ({_, event}) -> elem(event, 0) == :midi end)
       |> Enum.count
 
-    assert midi_count == 6
+    assert midi_count == 16
   end
 end
